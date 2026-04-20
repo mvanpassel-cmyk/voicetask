@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VoiceTask</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --recording: #ef4444;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .app-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  .lang-toggle {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px;
+    display: flex;
+    gap: 2px;
+  }
+
+  .lang-btn {
+    padding: 4px 10px;
+    border-radius: 16px;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .lang-btn.active { background: var(--primary); color: white; }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+  }
+
+  /* ── Chat ── */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .message {
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.5;
+    word-wrap: break-word;
+  }
+
+  .message.user {
+    background: var(--primary);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+
+  .message.assistant {
+    background: #f1f5f9;
+    color: var(--text);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+
+  .message.interim {
+    background: #f1f5f9;
+    color: var(--text-muted);
+    align-self: flex-end;
+    border: 2px dashed var(--border);
+    font-style: italic;
+  }
+
+  .typing-indicator {
+    display: flex;
+    gap: 5px;
+    padding: 12px 16px;
+    background: #f1f5f9;
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+    width: fit-content;
+  }
+
+  .typing-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: bounce 1.4s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-7px); }
+  }
+
+  /* ── Task Panel ── */
+  .task-panel {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    max-height: 38vh;
+    display: flex;
+    flex-direction: column;
+    transition: max-height 0.3s ease;
+  }
+
+  .task-header {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .task-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .task-count {
+    background: var(--primary);
+    color: white;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .task-count.zero { background: var(--text-muted); }
+
+  .task-chevron {
+    color: var(--text-muted);
+    font-size: 11px;
+    transition: transform 0.2s;
+  }
+
+  .task-panel.expanded .task-chevron { transform: rotate(180deg); }
+
+  .task-list {
+    overflow-y: auto;
+    padding: 0 16px 12px;
+    display: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .task-panel.expanded .task-list { display: block; }
+
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .task-item:last-child { border-bottom: none; }
+
+  .task-check {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    background: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+  }
+
+  .task-check.done { background: var(--primary); border-color: var(--primary); }
+  .task-check.done::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; }
+
+  .task-text { flex: 1; line-height: 1.4; }
+  .task-text.done { text-decoration: line-through; color: var(--text-muted); }
+
+  .task-delete {
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 18px;
+    line-height: 1;
+    background: none;
+    border: none;
+    flex-shrink: 0;
+  }
+
+  .empty-tasks {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 10px 0;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 14px 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .controls-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mic-btn {
+    width: 68px; height: 68px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.45);
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mic-btn:active { transform: scale(0.93); }
+
+  .mic-btn.recording {
+    background: var(--recording);
+    box-shadow: 0 4px 14px rgba(239,68,68,0.4);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0   rgba(239,68,68,0.5); }
+    70%  { box-shadow: 0 0 0 14px rgba(239,68,68,0);   }
+    100% { box-shadow: 0 0 0 0   rgba(239,68,68,0);   }
+  }
+
+  .mic-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    min-height: 16px;
+  }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+
+  .modal {
+    background: white;
+    border-radius: 20px;
+    padding: 28px 24px 24px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+
+  .modal h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+
+  .modal p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 18px;
+    line-height: 1.55;
+  }
+
+  .modal input {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 12px;
+    font-family: monospace;
+    letter-spacing: 0.3px;
+  }
+
+  .modal input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+  .modal-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .modal-btn:hover { background: var(--primary-dark); }
+
+  .error-msg {
+    color: var(--recording);
+    font-size: 13px;
+    margin-top: 8px;
+    display: none;
+  }
+
+  .modal-link { color: var(--primary); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- ── API Key Modal ── -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <h2>🎙️ VoiceTask</h2>
+    <p>Enter your Anthropic API key to get started. It's stored only in your browser and sent directly to Anthropic — nowhere else.</p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    <button class="modal-btn" onclick="saveApiKey()">Start chatting</button>
+    <p class="error-msg" id="apiError">Key should start with "sk-ant-" or "sk-".</p>
+    <p style="margin-top:14px; font-size:12px; color:var(--text-muted);">
+      Get a free key at <a class="modal-link" href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+    </p>
+  </div>
+</div>
+
+<!-- ── Header ── -->
+<header>
+  <div class="app-title">🎙️ VoiceTask</div>
+  <div class="header-actions">
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="btnEN" onclick="setLang('en-US')">EN</button>
+      <button class="lang-btn"        id="btnNL" onclick="setLang('nl-NL')">NL</button>
+    </div>
+    <button class="icon-btn" onclick="showApiKeyModal()" title="Settings">⚙️</button>
+    <button class="icon-btn" onclick="clearChat()"       title="Clear chat">🗑️</button>
+  </div>
+</header>
+
+<!-- ── Chat area ── -->
+<div class="chat-area" id="chatArea">
+  <div class="message assistant">
+    Hi! Tap the mic and start talking. I'll chat with you and extract any tasks you mention. Switch between EN and NL at the top. 🎙️
+  </div>
+</div>
+
+<!-- ── Task panel ── -->
+<div class="task-panel" id="taskPanel">
+  <div class="task-header" onclick="toggleTasks()">
+    <div class="task-header-left">
+      📋 Tasks <span class="task-count zero" id="taskCount">0</span>
+    </div>
+    <span class="task-chevron" id="taskChevron">▼</span>
+  </div>
+  <div class="task-list" id="taskList">
+    <div class="empty-tasks" id="emptyTasks">No tasks yet — just mention something you need to do.</div>
+  </div>
+</div>
+
+<!-- ── Controls ── -->
+<div class="controls">
+  <div class="controls-inner">
+    <button class="mic-btn" id="micBtn" onclick="toggleRecording()">🎙️</button>
+    <div class="mic-status" id="micStatus">Tap to speak</div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+let apiKey             = localStorage.getItem('vt_api_key') || '';
+let conversationHistory = [];
+let tasks              = JSON.parse(localStorage.getItem('vt_tasks') || '[]');
+let recognition        = null;
+let isRecording        = false;
+let currentLang        = 'en-US';
+let interimEl          = null;
+
+// ── Boot ───────────────────────────────────────────────────
+document.getElementById('apiModal').style.display = apiKey ? 'none' : 'flex';
+renderTasks();
+
+// ── API key ────────────────────────────────────────────────
+function saveApiKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val.startsWith('sk-')) {
+    document.getElementById('apiError').style.display = 'block';
+    return;
+  }
+  apiKey = val;
+  localStorage.setItem('vt_api_key', apiKey);
+  document.getElementById('apiModal').style.display = 'none';
+  document.getElementById('apiError').style.display = 'none';
+}
+
+function showApiKeyModal() {
+  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('apiModal').style.display = 'flex';
+}
+
+document.getElementById('apiKeyInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveApiKey();
+});
+
+// ── Language toggle ────────────────────────────────────────
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById('btnEN').classList.toggle('active', lang === 'en-US');
+  document.getElementById('btnNL').classList.toggle('active', lang === 'nl-NL');
+  if (recognition) recognition.lang = lang;
+}
+
+// ── Speech recognition ─────────────────────────────────────
+function buildRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    alert('Speech recognition is not supported in this browser.\nPlease use Chrome (Android) or Safari (iOS 14.5+).');
+    return null;
+  }
+
+  const r = new SR();
+  r.continuous      = false;
+  r.interimResults  = true;
+  r.lang            = currentLang;
+
+  r.onstart = () => {
+    isRecording = true;
+    document.getElementById('micBtn').classList.add('recording');
+    document.getElementById('micBtn').textContent = '⏹️';
+    document.getElementById('micStatus').textContent = currentLang === 'nl-NL' ? 'Luisteren…' : 'Listening…';
+  };
+
+  r.onresult = event => {
+    const transcript = Array.from(event.results).map(x => x[0].transcript).join('');
+
+    if (!interimEl) {
+      interimEl = addBubble('interim', transcript);
+    } else {
+      interimEl.textContent = transcript;
+      scrollChat();
+    }
+
+    if (event.results[event.results.length - 1].isFinal) {
+      if (interimEl) { interimEl.remove(); interimEl = null; }
+      stopRecording();
+      if (transcript.trim()) sendMessage(transcript.trim());
+    }
+  };
+
+  r.onerror = e => {
+    stopRecording();
+    const msgs = {
+      'not-allowed': 'Microphone permission denied.',
+      'no-speech':   'No speech detected — try again.',
+      'network':     'Network error during transcription.',
+    };
+    document.getElementById('micStatus').textContent = msgs[e.error] || 'Error: ' + e.error;
+  };
+
+  r.onend = () => { if (isRecording) stopRecording(); };
+
+  return r;
+}
+
+function toggleRecording() {
+  if (!apiKey) { showApiKeyModal(); return; }
+  if (isRecording) {
+    recognition && recognition.stop();
+    stopRecording();
+  } else {
+    recognition = buildRecognition();
+    if (recognition) recognition.start();
+  }
+}
+
+function stopRecording() {
+  isRecording = false;
+  document.getElementById('micBtn').classList.remove('recording');
+  document.getElementById('micBtn').textContent = '🎙️';
+  document.getElementById('micStatus').textContent = 'Tap to speak';
+  if (interimEl) { interimEl.remove(); interimEl = null; }
+}
+
+// ── Claude API ─────────────────────────────────────────────
+const SYSTEM_PROMPT = `You are a friendly, concise voice assistant. The user may speak English or Dutch — always reply in the same language they used.
+
+Respond ONLY with valid JSON — no markdown, no extra text:
+{
+  "reply": "your conversational reply (1–3 short sentences, as if spoken aloud)",
+  "new_tasks": ["a task if the user mentions one", "another task if mentioned"]
+}
+
+Only add to new_tasks if the user explicitly mentions something they need to do (e.g. "I need to call Jan", "don't forget to buy milk", "remind me to send that report"). If nothing task-like is mentioned, return an empty array.`;
+
+async function sendMessage(text) {
+  addBubble('user', text);
+  conversationHistory.push({ role: 'user', content: text });
+
+  const typingEl = addTyping();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: conversationHistory,
+      }),
+    });
+
+    typingEl.remove();
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        addBubble('assistant', '⚠️ Invalid API key. Tap ⚙️ to update it.');
+        showApiKeyModal();
+      } else {
+        addBubble('assistant', `⚠️ Error ${res.status}: ${err.error?.message || 'Something went wrong.'}`);
+      }
+      conversationHistory.pop();
+      return;
+    }
+
+    const data = await res.json();
+    const raw  = data.content[0].text;
+
+    let parsed;
+    try   { parsed = JSON.parse(raw); }
+    catch { parsed = { reply: raw, new_tasks: [] }; }
+
+    conversationHistory.push({ role: 'assistant', content: raw });
+
+    addBubble('assistant', parsed.reply || '…');
+
+    const newTasks = (parsed.new_tasks || []).filter(t => t && t.trim());
+    if (newTasks.length) {
+      newTasks.forEach(t => tasks.push({ id: crypto.randomUUID(), text: t.trim(), done: false }));
+      localStorage.setItem('vt_tasks', JSON.stringify(tasks));
+      renderTasks();
+      const panel = document.getElementById('taskPanel');
+      if (!panel.classList.contains('expanded')) toggleTasks();
+    }
+
+  } catch (err) {
+    typingEl.remove();
+    addBubble('assistant', '⚠️ Network error. Check your connection and try again.');
+    conversationHistory.pop();
+    console.error(err);
+  }
+}
+
+// ── UI helpers ─────────────────────────────────────────────
+function addBubble(role, text) {
+  const el = document.createElement('div');
+  el.className = `message ${role}`;
+  el.textContent = text;
+  const area = document.getElementById('chatArea');
+  area.appendChild(el);
+  scrollChat();
+  return el;
+}
+
+function addTyping() {
+  const el = document.createElement('div');
+  el.className = 'typing-indicator';
+  el.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  const area = document.getElementById('chatArea');
+  area.appendChild(el);
+  scrollChat();
+  return el;
+}
+
+function scrollChat() {
+  const area = document.getElementById('chatArea');
+  area.scrollTop = area.scrollHeight;
+}
+
+// ── Task management ────────────────────────────────────────
+function renderTasks() {
+  const list    = document.getElementById('taskList');
+  const count   = document.getElementById('taskCount');
+  const pending = tasks.filter(t => !t.done).length;
+
+  count.textContent = pending;
+  count.className   = 'task-count' + (pending === 0 ? ' zero' : '');
+
+  list.innerHTML = '';
+
+  if (tasks.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-tasks';
+    empty.textContent = 'No tasks yet — just mention something you need to do.';
+    list.appendChild(empty);
+    return;
+  }
+
+  tasks.forEach(task => {
+    const item  = document.createElement('div');
+    item.className = 'task-item';
+
+    const check = document.createElement('button');
+    check.className = 'task-check' + (task.done ? ' done' : '');
+    check.setAttribute('aria-label', 'Toggle task');
+    check.onclick = () => toggleTask(task.id);
+
+    const span  = document.createElement('span');
+    span.className = 'task-text' + (task.done ? ' done' : '');
+    span.textContent = task.text;
+
+    const del   = document.createElement('button');
+    del.className = 'task-delete';
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Delete task');
+    del.onclick = () => deleteTask(task.id);
+
+    item.append(check, span, del);
+    list.appendChild(item);
+  });
+}
+
+function toggleTask(id) {
+  tasks = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
+  localStorage.setItem('vt_tasks', JSON.stringify(tasks));
+  renderTasks();
+}
+
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  localStorage.setItem('vt_tasks', JSON.stringify(tasks));
+  renderTasks();
+}
+
+function toggleTasks() {
+  const panel = document.getElementById('taskPanel');
+  panel.classList.toggle('expanded');
+  document.getElementById('taskChevron').textContent =
+    panel.classList.contains('expanded') ? '▲' : '▼';
+}
+
+function clearChat() {
+  if (!confirm('Clear conversation history? Tasks are kept.')) return;
+  conversationHistory = [];
+  document.getElementById('chatArea').innerHTML =
+    '<div class="message assistant">Chat cleared. Tap the mic to start a new conversation. 🎙️</div>';
+}
+</script>
+</body>
+</html>
